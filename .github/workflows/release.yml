@@ -1,0 +1,217 @@
+name: Release Paimon Trino Connector
+
+on:
+  workflow_dispatch:
+    inputs:
+      trino_version:
+        description: 'Trino version (e.g., 478, 440)'
+        required: true
+        type: string
+      airlift_version:
+        description: 'Airlift version (leave empty for auto-detection based on Trino version)'
+        required: false
+        type: string
+        default: ''
+      release_tag:
+        description: 'Release tag (e.g., v1.0.0-trino-478)'
+        required: true
+        type: string
+      release_name:
+        description: 'Release name (e.g., Paimon Trino 478 Connector v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Determine Airlift version
+        id: airlift
+        run: |
+          TRINO_VERSION="${{ inputs.trino_version }}"
+          AIRLIFT_VERSION="${{ inputs.airlift_version }}"
+
+          if [ -z "$AIRLIFT_VERSION" ]; then
+            echo "Auto-detecting Airlift version for Trino $TRINO_VERSION..."
+
+            # Fetch Trino parent POM to get Airlift version
+            TRINO_POM_URL="https://repo1.maven.org/maven2/io/trino/trino-root/${TRINO_VERSION}/trino-root-${TRINO_VERSION}.pom"
+
+            # Download and parse the POM
+            curl -s "$TRINO_POM_URL" -o trino-parent.pom
+
+            if [ -f trino-parent.pom ]; then
+              # Extract airlift version from the POM
+              AIRLIFT_VERSION=$(grep -oP '<dep.airlift.version>\K[^<]+' trino-parent.pom || echo "")
+
+              if [ -z "$AIRLIFT_VERSION" ]; then
+                echo "Could not auto-detect Airlift version. Using default mapping..."
+                # Fallback mapping based on known versions
+                case $TRINO_VERSION in
+                  478) AIRLIFT_VERSION="369" ;;
+                  477) AIRLIFT_VERSION="369" ;;
+                  476) AIRLIFT_VERSION="369" ;;
+                  468) AIRLIFT_VERSION="343" ;;
+                  440) AIRLIFT_VERSION="241" ;;
+                  *) AIRLIFT_VERSION="369" ;;
+                esac
+              fi
+
+              rm trino-parent.pom
+            else
+              echo "Failed to download Trino POM. Using default mapping..."
+              case $TRINO_VERSION in
+                478) AIRLIFT_VERSION="369" ;;
+                477) AIRLIFT_VERSION="369" ;;
+                476) AIRLIFT_VERSION="369" ;;
+                468) AIRLIFT_VERSION="343" ;;
+                440) AIRLIFT_VERSION="241" ;;
+                *) AIRLIFT_VERSION="369" ;;
+              esac
+            fi
+          fi
+
+          echo "Using Airlift version: $AIRLIFT_VERSION"
+          echo "version=$AIRLIFT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update pom.xml with Trino and Airlift versions
+        run: |
+          TRINO_VERSION="${{ inputs.trino_version }}"
+          AIRLIFT_VERSION="${{ steps.airlift.outputs.version }}"
+
+          echo "Updating pom.xml..."
+          echo "  Trino version: $TRINO_VERSION"
+          echo "  Airlift version: $AIRLIFT_VERSION"
+
+          # Update Trino version
+          sed -i "s/<trino.version>.*<\/trino.version>/<trino.version>${TRINO_VERSION}<\/trino.version>/" pom.xml
+
+          # Update Airlift version
+          sed -i "s/<airlift.version>.*<\/airlift.version>/<airlift.version>${AIRLIFT_VERSION}<\/airlift.version>/" pom.xml
+
+          echo "Updated pom.xml:"
+          grep -A2 "<trino.version>" pom.xml
+          grep -A2 "<airlift.version>" pom.xml
+
+      - name: Build with Maven
+        run: |
+          echo "Building Paimon Trino Connector..."
+          mvn clean package assembly:attached -Papache-build -DskipTests
+
+      - name: Prepare release artifacts
+        id: artifacts
+        run: |
+          mkdir -p release-artifacts
+
+          TRINO_VERSION="${{ inputs.trino_version }}"
+
+          # Find and copy the plugin assembly
+          PLUGIN_ZIP=$(find target -name "paimon-trino-${TRINO_VERSION}-*.zip" -type f | head -1)
+
+          if [ -z "$PLUGIN_ZIP" ]; then
+            echo "Error: Plugin assembly not found!"
+            exit 1
+          fi
+
+          cp "$PLUGIN_ZIP" release-artifacts/
+
+          # Also copy the main JAR
+          MAIN_JAR=$(find target -name "paimon-trino-${TRINO_VERSION}-*.jar" -type f ! -name "*-sources.jar" ! -name "*-tests.jar" | head -1)
+          if [ -n "$MAIN_JAR" ]; then
+            cp "$MAIN_JAR" release-artifacts/
+          fi
+
+          echo "Release artifacts:"
+          ls -lh release-artifacts/
+
+          # Set output variables
+          PLUGIN_ZIP_NAME=$(basename "$PLUGIN_ZIP")
+          echo "plugin_zip=$PLUGIN_ZIP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          TRINO_VERSION="${{ inputs.trino_version }}"
+          AIRLIFT_VERSION="${{ steps.airlift.outputs.version }}"
+
+          cat > release-notes.md << EOF
+          ## Paimon Trino Connector - Trino ${TRINO_VERSION}
+
+          This release provides the Apache Paimon connector for Trino ${TRINO_VERSION}.
+
+          ### Version Information
+
+          - **Trino Version**: ${TRINO_VERSION}
+          - **Airlift Version**: ${AIRLIFT_VERSION}
+          - **Paimon Version**: 1.0.0
+          - **Java Version**: 21
+
+          ### Installation
+
+          1. Download the plugin ZIP file: \`${{ steps.artifacts.outputs.plugin_zip }}\`
+          2. Extract the ZIP file to your Trino plugin directory:
+             \`\`\`bash
+             unzip ${{ steps.artifacts.outputs.plugin_zip }} -d /path/to/trino/plugin/
+             \`\`\`
+          3. Restart your Trino server
+
+          ### Configuration
+
+          Create a catalog configuration file (e.g., \`/etc/trino/catalog/paimon.properties\`):
+
+          \`\`\`properties
+          connector.name=paimon
+          warehouse=/path/to/warehouse
+          \`\`\`
+
+          For more configuration options, see the [Apache Paimon documentation](https://paimon.apache.org/).
+
+          ### Compatibility
+
+          - Compatible with Trino ${TRINO_VERSION}
+          - Requires Java 21 or later
+
+          ### Build Information
+
+          - Built with Maven
+          - Profile: \`apache-build\`
+          - Built on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          - Commit: ${{ github.sha }}
+
+          ---
+
+          🤖 Generated with [GitHub Actions](https://github.com/${{ github.repository }}/actions)
+          EOF
+
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: ${{ inputs.release_name }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          files: |
+            release-artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: paimon-trino-${{ inputs.trino_version }}
+          path: release-artifacts/*
+          retention-days: 30
