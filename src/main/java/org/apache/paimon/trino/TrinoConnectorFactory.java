@@ -142,7 +142,7 @@ public class TrinoConnectorFactory implements ConnectorFactory {
                     injector.getInstance(TrinoSessionProperties.class);
             TrinoTableOptions trinoTableOptions = injector.getInstance(TrinoTableOptions.class);
             Set<ConnectorTableFunction> connectorTableFunctions =
-                    injector.getInstance(new Key<>() {});
+                    injector.getInstance(new Key<Set<ConnectorTableFunction>>() {});
             FunctionProvider functionProvider = injector.getInstance(FunctionProvider.class);
 
             return new TrinoConnector(

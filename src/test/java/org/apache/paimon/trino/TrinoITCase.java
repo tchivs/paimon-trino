@@ -178,15 +178,12 @@ public class TrinoITCase extends AbstractTestQueryFramework {
             FileStoreTable table = FileStoreTableFactory.create(LocalFileIO.create(), tablePath4);
             InnerTableWrite writer = table.newWrite("user");
             InnerTableCommit commit = table.newCommit("user");
+            Map<Object, Object> map = new HashMap<>();
+            map.put(fromString("1"), fromString("2"));
             writer.write(
                     GenericRow.of(
                             1,
-                            new GenericMap(
-                                    new HashMap<>() {
-                                        {
-                                            put(fromString("1"), fromString("2"));
-                                        }
-                                    }),
+                            new GenericMap(map),
                             GenericRow.of(2, fromString("male")),
                             new GenericArray(new int[] {1, 2, 3})));
             commit.commit(0, writer.prepareCommit(true, 0));

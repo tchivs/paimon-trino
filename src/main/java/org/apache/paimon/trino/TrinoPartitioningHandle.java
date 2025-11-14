@@ -19,10 +19,10 @@
 package org.apache.paimon.trino;
 
 import org.apache.paimon.schema.TableSchema;
+import org.apache.paimon.shade.jackson2.com.fasterxml.jackson.annotation.JsonCreator;
+import org.apache.paimon.shade.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.paimon.utils.InstantiationUtil;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import io.trino.spi.connector.ConnectorPartitioningHandle;
 
 import java.io.IOException;

@@ -9,6 +9,10 @@ Apache Paimon Trino Connector is a Trino plugin that enables querying Apache Pai
 ## Build Prerequisites
 
 **IMPORTANT**: This project depends on the parent POM from the main Apache Paimon project. Before building paimon-trino, you must:
+SET JAVA_HOME: /root/.jdks/ms-21.0.9
+maven_home: /opt/bigdata/apache-maven-3.9.6
+
+export JAVA_HOME=/root/.jdks/ms-21.0.9 && export PATH=$JAVA_HOME/bin:$PATH && /opt/bigdata/apache-maven-3.9.6/bin/mvn
 
 1. Clone and build the main Paimon repository:
 ```bash

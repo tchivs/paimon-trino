@@ -54,7 +54,14 @@ public class TrinoFilterExtractor {
 
     public static final String TRINO_MAP_ELEMENT_AT_FUNCTION_NAME = "element_at";
 
-    /** Extract filter from trino , include ExpressionFilter. */
+    /**
+     * Extract filter from trino, include ExpressionFilter.
+     *
+     * @param catalog the Trino catalog
+     * @param trinoTableHandle the Trino table handle
+     * @param constraint the constraint to extract filters from
+     * @return an Optional containing the extracted TrinoFilter, or empty if no new filters
+     */
     public static Optional<TrinoFilter> extract(
             TrinoCatalog catalog, TrinoTableHandle trinoTableHandle, Constraint constraint) {
 
@@ -100,6 +107,9 @@ public class TrinoFilterExtractor {
     /**
      * Extract Expression filter from trino Constraint. Extract Trino Expression filter ( e.g.
      * element_at(jsonmap, 'a') = '1' ) to TrinoColumnHandle.
+     *
+     * @param constraint the constraint to extract expression filters from
+     * @return a map of TrinoColumnHandle to Domain representing the extracted expression filters
      */
     public static Map<TrinoColumnHandle, Domain> extractTrinoColumnHandleForExpressionFilter(
             Constraint constraint) {
