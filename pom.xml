@@ -77,6 +77,7 @@ under the License.
             <groupId>io.trino.hadoop</groupId>
             <artifactId>hadoop-apache</artifactId>
             <version>${hadoop.apache.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -101,12 +102,14 @@ under the License.
             <groupId>io.trino</groupId>
             <artifactId>trino-hdfs</artifactId>
             <version>${trino.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>io.trino</groupId>
             <artifactId>trino-hive</artifactId>
             <version>${trino.version}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
